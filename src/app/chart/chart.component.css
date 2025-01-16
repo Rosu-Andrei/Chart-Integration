@@ -1,0 +1,46 @@
+.draggable {
+  fill: none;
+  pointer-events: all;
+}
+
+.angle-input-container {
+  position: absolute;
+  top: 0;
+  left: 810px;
+  /* Positioned to the right of the chart */
+  z-index: 10;
+  background: white;
+  padding: 10px;
+  border: 1px solid black;
+  display: flex;
+  flex-direction: column;
+  max-width: 200px;
+}
+
+.angle-input {
+  margin-bottom: 5px;
+  padding: 5px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.angle-label {
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.svg-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  /* Do not block pointer events */
+  width: 100%;
+  height: 100%;
+}
+
+#plotly-chart {
+  width: 100%;
+  height: 100%;
+}

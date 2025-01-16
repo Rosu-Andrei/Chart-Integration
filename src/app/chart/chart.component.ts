@@ -1,10 +1,302 @@
-import { Component } from '@angular/core';
+import {AfterViewInit, Component} from '@angular/core';
+
+import * as d3 from 'd3';
+import * as Plotly from 'plotly.js-dist-min';
 
 @Component({
   selector: 'app-chart',
   templateUrl: './chart.component.html',
   styleUrl: './chart.component.css'
 })
-export class ChartComponent {
+export class ChartComponent implements AfterViewInit {
+  plotlyContainerStyle = 'position: relative; width: 800px; height: 800px;';
 
+  angles = [
+    {name: 'Homozygous Max', angle: 30, start: {x: 0, y: 0}, end: {}},
+    {name: 'Heterozygous Min', angle: 50, start: {x: 0, y: 0}, end: {}},
+    {name: 'Heterozygous Max', angle: 54, start: {x: 0, y: 0}, end: {}},
+    {name: 'Homozygous Min', angle: 65, start: {x: 0, y: 0}, end: {}}
+  ];
+
+  axisRange: number = 12;
+  lineData: any[] = [];
+  curveData = {
+    start: {x: 0, y: 4},
+    end: {x: 4, y: 0},
+    controlPoint: {x: 4, y: 4}
+  };
+  /**
+   * will store the element with id 'plotly-chart'
+   */
+  plotlyChart: HTMLElement | null = null;
+  /**
+   * will store the element with id angle-input-container
+   */
+  angleInputContainer: HTMLElement | null = null;
+  /**
+   * will store the d3 selection for the svg-overlay class and svg
+   */
+  svg: any;
+  /**
+   * this two hold the values generated from d3.scaleLinear()
+   */
+  xScale: any;
+  yScale: any;
+
+  ngAfterViewInit() {
+    this.initializeDOMElements();
+  }
+
+
+  initializeDOMElements(): void {
+    this.plotlyChart = document.getElementById('plotly-chart');
+    this.angleInputContainer = document.getElementById('angle-input-container');
+    this.svg = d3.select('.svg-overlay svd');
+  }
+
+  setupScales(): void {
+    this.xScale = d3.scaleLinear().domain([0, this.axisRange]).range([0, 800]);
+    this.yScale = d3.scaleLinear().domain([0, this.axisRange]).range([800, 0]);
+  }
+
+  buildAngleInputs() {
+    this.angles.forEach((ele, index) => {
+      const angleRad = (ele.angle * Math.PI) / 180;
+      const r = 1;
+      const xx = r * Math.cos(angleRad);
+      const yy = r * Math.sin(angleRad);
+      const angleResult = this.calculateLineEndPoint(xx, yy);
+      ele.end = {x: angleResult.x, y: angleResult.y};
+      this.lineData.push(ele);
+
+      if (this.angleInputContainer) {
+        const angleLabel = document.createElement('div');
+        angleLabel.className = 'angle-label';
+        angleLabel.textContent = `${ele.name}:`;
+
+        const angleInput = document.createElement('input');
+        angleInput.type = 'text';
+        angleInput.className = 'angle-input';
+        angleInput.id = `angle-${index}`;
+        angleInput.value = `${ele.angle.toFixed(2)}�`;
+
+        this.angleInputContainer.appendChild(angleLabel);
+        this.angleInputContainer.appendChild(angleInput);
+      }
+    });
+  }
+
+  calculateLineEndPoint(x: number, y: number) {
+    const slope = y / x;
+    const xMax = this.axisRange;
+    const yMax = this.axisRange;
+    const yAtXMax = slope * xMax;
+    const xAtYMax = yMax / slope;
+
+    if (yAtXMax <= yMax) {
+      return {x: xMax, y: yAtXMax};
+    } else {
+      return {x: xAtYMax, y: yMax};
+    }
+  }
+
+  calculateAngle(start: any, end: any) {
+    return Math.atan2(end.y - start.y, end.x - start.x) * 180 / Math.PI;
+  }
+
+  updateAngleInputs() {
+    this.lineData.forEach((line, index) => {
+      const angle = this.calculateAngle(line.start, line.end);
+      const angleInput = document.getElementById(`angle-${index}`) as HTMLInputElement;
+      if (angleInput)
+        angleInput.value = `${angle.toFixed(2)}`;
+    });
+  }
+
+  plotGraph() {
+
+    const plotData = this.lineData.map((line, index) => ({
+      x: [line.start.x, line.end.x],
+      y: [line.start.y, line.end.y],
+      type: 'scatter',
+      mode: 'lines',
+      name: line.name,
+      line: {color: 'blue'},
+      hoverinfo: 'name'
+    }));
+
+    const xAxis = {
+      x: [0, this.axisRange],
+      y: [0, 0],
+      type: 'scatter',
+      mode: 'lines',
+      line: {color: 'black'},
+      showlegend: false,
+      hoverinfo: 'skip'
+    };
+
+    const yAxis = {
+      x: [0, 0],
+      y: [0, this.axisRange],
+      type: 'scatter',
+      mode: 'lines',
+      line: {color: 'black'},
+      showlegend: false,
+      hoverinfo: 'skip'
+    };
+
+    const data = [...plotData, xAxis, yAxis];
+
+    const shapes = [
+      {
+        type: 'path',
+        path: `M 0 0 L ${this.lineData[0].end.x} ${this.lineData[0].end.y} L ${this.lineData[1].end.x} ${this.lineData[1].end.y} Z`,
+        fillcolor: 'rgba(0, 0, 255, 0.2)',
+        line: {width: 2}
+      },
+      {
+        type: 'path',
+        path: `M 0 0 L ${this.lineData[2].end.x} ${this.lineData[2].end.y} L ${this.lineData[3].end.x} ${this.lineData[3].end.y} Z`,
+        fillcolor: 'rgba(0, 0, 255, 0.2)',
+        line: {width: 2}
+      },
+      {
+        type: 'path',
+        path: `M 0 0 L ${this.curveData.start.x} ${this.curveData.start.y} Q ${this.curveData.controlPoint.x} ${this.curveData.controlPoint.y}, ${this.curveData.end.x} ${this.curveData.end.y} Z`,
+        fillcolor: 'rgba(0, 0, 255, 0.2)',
+        line: {width: 2}
+      }
+    ];
+
+    const layout = {
+      xaxis: {
+        range: [0, this.axisRange],
+        zeroline: false,
+        showgrid: false
+      },
+      yaxis: {
+        range: [0, this.axisRange],
+        scaleanchor: "x",
+        scaleratio: 1,
+        zeroline: false,
+        showgrid: false
+      },
+      shapes: shapes,
+      showlegend: false,
+      width: 800,
+      height: 800,
+      dragmode: false, // Disable Plotly drag interactions
+      hovermode: 'closest'
+    };
+
+    const config = {
+      displayModeBar: true,
+      displaylogo: false,
+      modeBarButtonsToRemove: ['select2d', 'lasso2d', 'hoverClosestCartesian', 'hoverCompareCartesian']
+    };
+    // @ts-ignore
+    Plotly.newPlot('plotly-chart', data, layout, config);
+  }
+
+  addDragInteractions(): void {
+
+    this.svg.selectAll('.draggable').remove();
+
+    const checkBoundaries = (newAngles: number[]) => {
+      return (
+        newAngles[0] < newAngles[1] &&
+        newAngles[1] < newAngles[2] &&
+        newAngles[2] < newAngles[3]
+      );
+    };
+
+    this.lineData.forEach((line, index) => {
+      const dragHandler = d3.drag()
+        .on('drag', (event) => {
+          // Maybe here will be an error
+          const dx = this.xScale.invert(d3.pointer(event)) - line.start.x;
+          const dy = this.yScale.invert(d3.pointer(event)) - line.start.y;
+
+          const angle = Math.atan2(dy, dx);
+          const length = Math.sqrt((line.end.x - line.start.x) ** 2 + (line.end.y - line.start.y) ** 2);
+
+          const newEndX = Math.max(this.xScale.domain()[0], Math.min(this.xScale.domain()[1], line.start.x + length * Math.cos(angle)));
+          const newEndY = Math.max(this.yScale.domain()[0], Math.min(this.yScale.domain()[1], line.start.y + length * Math.sin(angle)));
+
+          const angleResult = this.calculateLineEndPoint(newEndX, newEndY);
+
+          const newLine = {...line, end: angleResult};
+          const newAngle = this.calculateAngle(newLine.start, newLine.end);
+
+          let newAngles = this.lineData.map((l, idx) => {
+            if (idx === index) return newAngle;
+            return this.calculateAngle(l.start, l.end);
+          });
+
+          // Check if new angles meet the constraints
+          if (checkBoundaries(newAngles)) {
+            line.end.x = angleResult.x;
+            line.end.y = angleResult.y;
+          }
+
+          // Update Plotly chart with the new data
+          this.plotGraph();
+          // Update angle inputs
+          this.updateAngleInputs();
+          // Re-apply D3 drag interactions
+          this.addDragInteractions();
+        });
+
+      const x1 = Math.min(this.xScale(line.start.x), this.xScale(line.end.x));
+      const x2 = Math.max(this.xScale(line.start.x), this.xScale(line.end.x));
+      const y1 = Math.min(this.yScale(line.start.y), this.yScale(line.end.y));
+      const y2 = Math.max(this.yScale(line.start.y), this.yScale(line.end.y));
+
+      this.svg.append("rect")
+        .attr("class", `draggable-${index}`)
+        .attr("x", x1 - 10)
+        .attr("y", Math.min(y1, y2) - 10)
+        .attr("width", (x2 - x1) + 20)
+        .attr("height", Math.abs(y1 - y2) + 20)
+        .attr("fill", "transparent")
+        .style("pointer-events", "all") // Ensure it can be interacted with
+        .call(dragHandler);
+    });
+
+    const curveDragHandler = d3.drag()
+      .on('drag', (event) => {
+        const dy = this.yScale.invert(d3.pointer(event)) - this.curveData.controlPoint.y;
+        if (dy > 0.1 && this.curveData.controlPoint.x < this.axisRange) {
+          // Increase curve control points
+          this.curveData.controlPoint.x += 1;
+          this.curveData.controlPoint.y += 1;
+          this.curveData.start.y += 1;
+          this.curveData.end.x += 1;
+        } else if (dy < -0.1 && this.curveData.controlPoint.x > 0) {
+          // Decrease curve control points
+          this.curveData.controlPoint.x -= 1;
+          this.curveData.controlPoint.y -= 1;
+          this.curveData.start.y -= 1;
+          this.curveData.end.x -= 1;
+        }
+
+        // Update Plotly chart with the new data
+        this.plotGraph();
+        // Re-apply D3 drag interactions
+        this.addDragInteractions();
+      });
+
+    this.svg.append("rect")
+      .attr("class", "draggable-curve")
+      .attr("x", this.xScale(this.curveData.start.x) - 10)
+      .attr("y", Math.min(this.yScale(this.curveData.controlPoint.y), this.yScale(this.curveData.start.y)) - 10)
+      .attr("width", this.xScale(this.curveData.end.x) + 20)
+      .attr("height", Math.abs(this.yScale(this.curveData.start.y) - this.yScale(this.curveData.controlPoint.y)) + 20)
+      .attr("fill", "transparent")
+      .style("pointer-events", "all") // Ensure it can be interacted with
+      .call(curveDragHandler);
+  }
 }
+
+
+
