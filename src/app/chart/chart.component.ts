@@ -45,13 +45,17 @@ export class ChartComponent implements AfterViewInit {
 
   ngAfterViewInit() {
     this.initializeDOMElements();
+    this.setupScales();
+    this.buildAngleInputs();
+    this.plotGraph();
+    this.addDragInteractions();
   }
 
 
   initializeDOMElements(): void {
     this.plotlyChart = document.getElementById('plotly-chart');
     this.angleInputContainer = document.getElementById('angle-input-container');
-    this.svg = d3.select('.svg-overlay svd');
+    this.svg = d3.select('.svg-overlay svg');
   }
 
   setupScales(): void {
@@ -115,7 +119,7 @@ export class ChartComponent implements AfterViewInit {
 
   plotGraph() {
 
-    const plotData = this.lineData.map((line, index) => ({
+    const plotData: Plotly.Data[] = this.lineData.map((line, index) => ({
       x: [line.start.x, line.end.x],
       y: [line.start.y, line.end.y],
       type: 'scatter',
@@ -125,7 +129,7 @@ export class ChartComponent implements AfterViewInit {
       hoverinfo: 'name'
     }));
 
-    const xAxis = {
+    const xAxis: Plotly.Data = {
       x: [0, this.axisRange],
       y: [0, 0],
       type: 'scatter',
@@ -135,7 +139,7 @@ export class ChartComponent implements AfterViewInit {
       hoverinfo: 'skip'
     };
 
-    const yAxis = {
+    const yAxis: Plotly.Data = {
       x: [0, 0],
       y: [0, this.axisRange],
       type: 'scatter',
@@ -145,9 +149,9 @@ export class ChartComponent implements AfterViewInit {
       hoverinfo: 'skip'
     };
 
-    const data = [...plotData, xAxis, yAxis];
+    const data: Plotly.Data[] = [...plotData, xAxis, yAxis];
 
-    const shapes = [
+    const shapes: Partial<Plotly.Shape>[] = [
       {
         type: 'path',
         path: `M 0 0 L ${this.lineData[0].end.x} ${this.lineData[0].end.y} L ${this.lineData[1].end.x} ${this.lineData[1].end.y} Z`,
@@ -168,7 +172,7 @@ export class ChartComponent implements AfterViewInit {
       }
     ];
 
-    const layout = {
+    const layout: Partial<Plotly.Layout> = {
       xaxis: {
         range: [0, this.axisRange],
         zeroline: false,
@@ -189,12 +193,12 @@ export class ChartComponent implements AfterViewInit {
       hovermode: 'closest'
     };
 
-    const config = {
+    const config: Partial<Plotly.Config> = {
       displayModeBar: true,
       displaylogo: false,
       modeBarButtonsToRemove: ['select2d', 'lasso2d', 'hoverClosestCartesian', 'hoverCompareCartesian']
     };
-    // @ts-ignore
+
     Plotly.newPlot('plotly-chart', data, layout, config);
   }
 
@@ -214,8 +218,9 @@ export class ChartComponent implements AfterViewInit {
       const dragHandler = d3.drag()
         .on('drag', (event) => {
           // Maybe here will be an error
-          const dx = this.xScale.invert(d3.pointer(event)) - line.start.x;
-          const dy = this.yScale.invert(d3.pointer(event)) - line.start.y;
+          const [x, y] = d3.pointer(event);
+          const dx = this.xScale.invert(x) - line.start.x;
+          const dy = this.yScale.invert(y) - line.start.y;
 
           const angle = Math.atan2(dy, dx);
           const length = Math.sqrt((line.end.x - line.start.x) ** 2 + (line.end.y - line.start.y) ** 2);
@@ -265,7 +270,8 @@ export class ChartComponent implements AfterViewInit {
 
     const curveDragHandler = d3.drag()
       .on('drag', (event) => {
-        const dy = this.yScale.invert(d3.pointer(event)) - this.curveData.controlPoint.y;
+        const [x, y] = d3.pointer(event);
+        const dy = this.yScale.invert(y) - this.curveData.controlPoint.y;
         if (dy > 0.1 && this.curveData.controlPoint.x < this.axisRange) {
           // Increase curve control points
           this.curveData.controlPoint.x += 1;
