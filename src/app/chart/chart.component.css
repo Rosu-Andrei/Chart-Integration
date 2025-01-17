@@ -1,6 +1,7 @@
 .draggable {
   fill: none;
   pointer-events: all;
+  cursor: pointer;
 }
 
 .angle-input-container {
@@ -32,12 +33,12 @@
 
 .svg-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
+  top: 40px;
+  left: 60px;
   pointer-events: none;
   /* Do not block pointer events */
-  width: 100%;
-  height: 100%;
+  width: calc(100% - 100px);
+  height: calc(100% - 100px);
 }
 
 #plotly-chart {

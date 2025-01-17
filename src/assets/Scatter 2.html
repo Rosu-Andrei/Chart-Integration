@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Combined Plotly and D3 Line Drag Example</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <style>
+        .draggable {
+            fill: none;
+            pointer-events: all;
+            cursor: pointer;
+        }
+
+        .angle-input-container {
+            position: absolute;
+            top: 0;
+            left: 810px;
+            /* Positioned to the right of the chart */
+            z-index: 10;
+            background: white;
+            padding: 10px;
+            border: 1px solid black;
+            display: flex;
+            flex-direction: column;
+            max-width: 200px;
+        }
+
+        .angle-input {
+            margin-bottom: 5px;
+            padding: 5px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .angle-label {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .svg-overlay {
+            position: absolute;
+            top: 40px;  /* Adjust to sit correctly over the chart */
+            left: 60px;  /* Adjust to sit correctly over the chart */
+            pointer-events: none;
+            width: calc(100% - 100px);  /* Adjust to sit correctly over the chart */
+            height: calc(100% - 80px);  /* Adjust to sit correctly over the chart */
+        }
+    </style>
+</head>
+
+<body>
+    <div id="plotly-chart-container" style="position: relative; width: 800px; height: 800px;">
+        <div id="plotly-chart" style="width: 100%; height: 100%;"></div>
+        <div class="svg-overlay">
+            <svg width="100%" height="100%"></svg>
+        </div>
+    </div>
+    <div class="angle-input-container" id="angle-input-container">
+        <!-- Text boxes for angles will be added here dynamically -->
+    </div>
+    <script>
+        const angles = [
+            { name: 'Homozygous Max', angle: 30, start: { x: 0, y: 0 }, end: {} },
+            { name: 'Heterozygous Min', angle: 50, start: { x: 0, y: 0 }, end: {} },
+            { name: 'Heterozygous Max', angle: 54, start: { x: 0, y: 0 }, end: {} },
+            { name: 'Homozygous Min', angle: 65, start: { x: 0, y: 0 }, end: {} }
+        ];
+
+        const axisRange = 6;
+        const lineData = [];
+        let curveData = {
+            start: { x: 0, y: 4 },
+            end: { x: 4, y: 0 },
+            controlPoint: { x: 4, y: 4 }
+        };
+
+        const plotlyChart = document.getElementById('plotly-chart');
+        const angleInputContainer = document.getElementById('angle-input-container');
+        const svg = d3.select('.svg-overlay svg').style("pointer-events", "all");
+
+        const xScale = d3.scaleLinear().domain([0, 6]).range([0, 800 - 100]); // Adjust range size to match the SVG size
+        const yScale = d3.scaleLinear().domain([0, 12]).range([800 - 80, 0]); // Adjust range size to match the SVG size
+
+        angles.forEach((ele, index) => {
+            const angleRad = (ele.angle * Math.PI) / 180;
+            const r = 1;
+            const xx = r * Math.cos(angleRad);
+            const yy = r * Math.sin(angleRad);
+            const angleResult = calculateLineEndPoint(xx, yy);
+            ele.end = { x: angleResult.x, y: angleResult.y };
+            lineData.push(ele);
+
+            // Create the label and text box for the angle
+            const angleLabel = document.createElement('div');
+            angleLabel.className = 'angle-label';
+            angleLabel.textContent = `${ele.name}:`;
+
+            const angleInput = document.createElement('input');
+            angleInput.type = 'text';
+            angleInput.className = 'angle-input';
+            angleInput.id = `angle-${index}`;
+            angleInput.value = `${ele.angle.toFixed(2)}�`;
+
+            angleInputContainer.appendChild(angleLabel);
+            angleInputContainer.appendChild(angleInput);
+        });
+
+        function calculateLineEndPoint(x, y) {
+            const slope = y / x;
+            const xMax = axisRange;
+            const yMax = 12;
+            const yAtXMax = slope * xMax;
+            const xAtYMax = yMax / slope;
+
+            if (yAtXMax <= yMax) {
+                return { x: xMax, y: yAtXMax };
+            } else {
+                return { x: xAtYMax, y: yMax };
+            }
+        }
+
+        function calculateAngle(start, end) {
+            return Math.atan2(end.y - start.y, end.x - start.x) * 180 / Math.PI;
+        }
+
+        function updateAngleInputs() {
+            lineData.forEach((line, index) => {
+                const angle = calculateAngle(line.start, line.end);
+                const angleInput = document.getElementById(`angle-${index}`);
+                angleInput.value = `${angle.toFixed(2)}�`;
+            });
+        }
+
+        function plotGraph() {
+            const plotData = lineData.map((line) => ({
+                x: [line.start.x, line.end.x],
+                y: [line.start.y, line.end.y],
+                type: 'scatter',
+                mode: 'lines',
+                name: line.name,
+                line: { color: 'blue' },
+                hoverinfo: 'name'
+            }));
+
+            const xAxis = {
+                x: [0, axisRange],
+                y: [0, 0],
+                type: 'scatter',
+                mode: 'lines',
+                line: { color: 'black' },
+                showlegend: false,
+                hoverinfo: 'skip'
+            };
+
+            const yAxis = {
+                x: [0, 0],
+                y: [0, axisRange],
+                type: 'scatter',
+                mode: 'lines',
+                line: { color: 'black' },
+                showlegend: false,
+                hoverinfo: 'skip'
+            };
+
+            const data = [...plotData, xAxis, yAxis];
+
+            const shapes = [
+                {
+                    type: 'path',
+                    path: `M 0 0 L ${lineData[0].end.x} ${lineData[0].end.y} L ${lineData[1].end.x} ${lineData[1].end.y} Z`,
+                    fillcolor: 'rgba(0, 0, 255, 0.2)',
+                    line: { width: 2 }
+                },
+                {
+                    type: 'path',
+                    path: `M 0 0 L ${lineData[2].end.x} ${lineData[2].end.y} L ${lineData[3].end.x} ${lineData[3].end.y} Z`,
+                    fillcolor: 'rgba(0, 0, 255, 0.2)',
+                    line: { width: 2 }
+                },
+                {
+                    type: 'path',
+                    path: `M 0 0 L ${curveData.start.x} ${curveData.start.y} Q ${curveData.controlPoint.x} ${curveData.controlPoint.y}, ${curveData.end.x} ${curveData.end.y} Z`,
+                    fillcolor: 'rgba(0, 0, 255, 0.2)',
+                    line: { width: 2 }
+                }
+            ];
+
+            const layout = {
+                xaxis: {
+                    range: [0, axisRange],
+                    zeroline: false,
+                    showgrid: false
+                },
+                yaxis: {
+                    range: [0, axisRange],
+                    scaleanchor: "x",
+                    scaleratio: 1,
+                    zeroline: false,
+                    showgrid: false
+                },
+                shapes: shapes,
+                showlegend: false,
+                width: 800,
+                height: 800,
+                dragmode: false, // Disable Plotly drag interactions
+                hovermode: 'closest'
+            };
+
+            const config = {
+                displayModeBar: true,
+                displaylogo: false,
+                modeBarButtonsToRemove: ['select2d', 'lasso2d', 'hoverClosestCartesian', 'hoverCompareCartesian']
+            };
+
+            Plotly.newPlot('plotly-chart', data, layout, config);
+        }
+
+        function updatePlotAndDrag() {
+            plotGraph();
+            addDragInteractions();
+        }
+
+        function addDragInteractions() {
+            const svg = d3.select('.svg-overlay svg');
+
+            svg.selectAll('.draggable').remove();
+
+            function checkBoundaries(newAngles) {
+                return (
+                    newAngles[0] < newAngles[1] &&
+                    newAngles[1] < newAngles[2] &&
+                    newAngles[2] < newAngles[3]
+                );
+            }
+
+            lineData.forEach((line, index) => {
+                const dragHandler = d3.drag()
+                    .on('start', function () {
+                        d3.select(this).attr('cursor', 'grabbing');
+                    })
+                    .on('drag', function () {
+                        const dx = xScale.invert(d3.event.x) - line.start.x;
+                        const dy = yScale.invert(d3.event.y) - line.start.y;
+                        const angle = Math.atan2(dy, dx);
+                        const length = Math.sqrt((line.end.x - line.start.x) ** 2 + (line.end.y - line.start.y) ** 2);
+
+                        const newEndX = Math.max(xScale.domain()[0], Math.min(xScale.domain()[1], line.start.x + length * Math.cos(angle)));
+                        const newEndY = Math.max(yScale.domain()[0], Math.min(yScale.domain()[1], line.start.y + length * Math.sin(angle)));
+
+                        const angleResult = calculateLineEndPoint(newEndX, newEndY);
+
+                        const newLine = { ...line, end: angleResult };
+                        const newAngle = calculateAngle(newLine.start, newLine.end);
+
+                        let newAngles = lineData.map((l, idx) => {
+                            if (idx === index) return newAngle;
+                            return calculateAngle(l.start, l.end);
+                        });
+
+                        // Check if new angles meet the constraints
+                        if (checkBoundaries(newAngles)) {
+                            line.end.x = angleResult.x;
+                            line.end.y = angleResult.y;
+                        }
+
+                        updatePlotAndDrag();
+
+                    }).on('end', function () {
+                        d3.select(this).attr('cursor', 'pointer');
+                    });
+
+                const x1 = Math.min(xScale(line.start.x), xScale(line.end.x));
+                const x2 = Math.max(xScale(line.start.x), xScale(line.end.x));
+                const y1 = Math.min(yScale(line.start.y), yScale(line.end.y));
+                const y2 = Math.max(yScale(line.start.y), yScale(line.end.y));
+
+                svg.append("rect")
+                    .attr("class", `draggable-${index}`)
+                    .attr("x", x1 - 10)
+                    .attr("y", y2 - 10)
+                    .attr("width", Math.abs(x2 - x1) + 20)
+                    .attr("height", Math.abs(y1 - y2) + 20)
+                    .attr("fill", "transparent")
+                    .style("pointer-events", "all")
+                    .style("cursor", "pointer")
+                    .call(dragHandler);
+            });
+
+            const curveDragHandler = d3.drag()
+                .on('start', function () {
+                    d3.select(this).attr('cursor', 'grabbing');
+                })
+                .on('drag', function () {
+                    const dy = yScale.invert(d3.event.y) - curveData.controlPoint.y;
+
+                    // Adjust start and end points by 1 based on drag direction
+                    if (dy > 0.1 && curveData.controlPoint.y < axisRange) {
+                        // Increase curve start and end points by 1
+                        curveData.start.y += 1;
+                        curveData.end.x += 1;
+                    } else if (dy < -0.1 && curveData.controlPoint.y > 0) {
+                        // Decrease curve start and end points by 1
+                        curveData.start.y -= 1;
+                        curveData.end.x -= 1;
+                    }
+
+                    // Update the control point to maintain the curve shape
+                    curveData.controlPoint.x = curveData.end.x;
+                    curveData.controlPoint.y = curveData.start.y;
+
+                    updatePlotAndDrag();
+
+                }).on('end', function () {
+                    d3.select(this).attr('cursor', 'pointer');
+                });
+
+            const startX = Math.min(curveData.start.x, curveData.controlPoint.x, curveData.end.x);
+            const startY = Math.min(curveData.start.y, curveData.controlPoint.y, curveData.end.y);
+            const endX = Math.max(curveData.start.x, curveData.controlPoint.x, curveData.end.x);
+            const endY = Math.max(curveData.start.y, curveData.controlPoint.y, curveData.end.y);
+
+            svg.append("rect")
+                .attr("class", "draggable draggable-curve")
+                .attr("x", xScale(startX))
+                .attr("y", yScale(endY))
+                .attr("width", Math.abs(xScale(endX) - xScale(startX)))
+                .attr("height", Math.abs(yScale(startY) - yScale(endY)))
+                .attr("fill", "transparent")
+                .style("pointer-events", "all")
+                .style("cursor", "pointer")
+                .call(curveDragHandler);
+        }
+
+        // Call the functions initially
+        updatePlotAndDrag();
+    </script>
+</body>
+
+</html>

@@ -18,7 +18,7 @@ export class ChartComponent implements AfterViewInit {
     {name: 'Homozygous Min', angle: 65, start: {x: 0, y: 0}, end: {}}
   ];
 
-  axisRange: number = 12;
+  axisRange: number = 6;
   lineData: any[] = [];
   curveData = {
     start: {x: 0, y: 4},
@@ -47,20 +47,19 @@ export class ChartComponent implements AfterViewInit {
     this.initializeDOMElements();
     this.setupScales();
     this.buildAngleInputs();
-    this.plotGraph();
-    this.addDragInteractions();
+    this.updatePlotAndDrag();
   }
 
 
   initializeDOMElements(): void {
     this.plotlyChart = document.getElementById('plotly-chart');
     this.angleInputContainer = document.getElementById('angle-input-container');
-    this.svg = d3.select('.svg-overlay svg');
+    this.svg = d3.select('.svg-overlay svg').style("pointer-events", "all");
   }
 
   setupScales(): void {
-    this.xScale = d3.scaleLinear().domain([0, this.axisRange]).range([0, 800]);
-    this.yScale = d3.scaleLinear().domain([0, this.axisRange]).range([800, 0]);
+    this.xScale = d3.scaleLinear().domain([0, 6]).range([0, 800 - 100]);
+    this.yScale = d3.scaleLinear().domain([0, 12]).range([800 - 80, 0]);
   }
 
   buildAngleInputs() {
@@ -93,7 +92,7 @@ export class ChartComponent implements AfterViewInit {
   calculateLineEndPoint(x: number, y: number) {
     const slope = y / x;
     const xMax = this.axisRange;
-    const yMax = this.axisRange;
+    const yMax = 12;
     const yAtXMax = slope * xMax;
     const xAtYMax = yMax / slope;
 
@@ -113,7 +112,7 @@ export class ChartComponent implements AfterViewInit {
       const angle = this.calculateAngle(line.start, line.end);
       const angleInput = document.getElementById(`angle-${index}`) as HTMLInputElement;
       if (angleInput)
-        angleInput.value = `${angle.toFixed(2)}`;
+        angleInput.value = `${angle.toFixed(2)}�`;
     });
   }
 
@@ -125,7 +124,7 @@ export class ChartComponent implements AfterViewInit {
       type: 'scatter',
       mode: 'lines',
       name: line.name,
-      line: {color: 'blue'},
+      line: {color: 'blue', class: `line-${index}`},
       hoverinfo: 'name'
     }));
 
@@ -186,7 +185,7 @@ export class ChartComponent implements AfterViewInit {
         showgrid: false
       },
       shapes: shapes,
-      showlegend: false,
+      showlegend: true,
       width: 800,
       height: 800,
       dragmode: false, // Disable Plotly drag interactions
@@ -200,6 +199,11 @@ export class ChartComponent implements AfterViewInit {
     };
 
     Plotly.newPlot('plotly-chart', data, layout, config);
+  }
+
+  updatePlotAndDrag() {
+    this.plotGraph();
+    this.addDragInteractions();
   }
 
   addDragInteractions(): void {
@@ -216,6 +220,10 @@ export class ChartComponent implements AfterViewInit {
 
     this.lineData.forEach((line, index) => {
       const dragHandler = d3.drag()
+        .on('start', function () {
+          d3.select(this).attr('cursor', 'grabbing');
+          Plotly.restyle('plotly-chart', {'line.color': ['green']}, [index]);
+        })
         .on('drag', (event) => {
           // Maybe here will be an error
           const [x, y] = d3.pointer(event);
@@ -223,7 +231,10 @@ export class ChartComponent implements AfterViewInit {
           const dy = this.yScale.invert(y) - line.start.y;
 
           const angle = Math.atan2(dy, dx);
-          const length = Math.sqrt((line.end.x - line.start.x) ** 2 + (line.end.y - line.start.y) ** 2);
+          const length = Math.sqrt(
+            (line.end.x - line.start.x) ** 2 +
+            (line.end.y - line.start.y) ** 2
+          );
 
           const newEndX = Math.max(this.xScale.domain()[0], Math.min(this.xScale.domain()[1], line.start.x + length * Math.cos(angle)));
           const newEndY = Math.max(this.yScale.domain()[0], Math.min(this.yScale.domain()[1], line.start.y + length * Math.sin(angle)));
@@ -234,7 +245,8 @@ export class ChartComponent implements AfterViewInit {
           const newAngle = this.calculateAngle(newLine.start, newLine.end);
 
           let newAngles = this.lineData.map((l, idx) => {
-            if (idx === index) return newAngle;
+            if (idx === index)
+              return newAngle;
             return this.calculateAngle(l.start, l.end);
           });
 
@@ -250,6 +262,10 @@ export class ChartComponent implements AfterViewInit {
           this.updateAngleInputs();
           // Re-apply D3 drag interactions
           this.addDragInteractions();
+        })
+        .on('end', function () {
+          d3.select(this).attr('cursor', 'pointer');
+          Plotly.restyle('plotly-chart', {'line.color': ['blue']}, [index]);
         });
 
       const x1 = Math.min(this.xScale(line.start.x), this.xScale(line.end.x));
@@ -258,7 +274,7 @@ export class ChartComponent implements AfterViewInit {
       const y2 = Math.max(this.yScale(line.start.y), this.yScale(line.end.y));
 
       this.svg.append("rect")
-        .attr("class", `draggable-${index}`)
+        .attr("class", `draggable draggable-${index}`)
         .attr("x", x1 - 10)
         .attr("y", Math.min(y1, y2) - 10)
         .attr("width", (x2 - x1) + 20)
@@ -300,8 +316,10 @@ export class ChartComponent implements AfterViewInit {
       .attr("height", Math.abs(this.yScale(this.curveData.start.y) - this.yScale(this.curveData.controlPoint.y)) + 20)
       .attr("fill", "transparent")
       .style("pointer-events", "all") // Ensure it can be interacted with
+      .style('cursor', 'pointer')
       .call(curveDragHandler);
   }
+
 }
 
 
