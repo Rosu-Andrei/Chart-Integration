@@ -276,10 +276,30 @@ export class ChartComponent implements AfterViewInit {
           Plotly.restyle('plotly-chart', {'line.color': ['blue']}, [index]);
         });
 
-      const x1 = Math.min(this.xScale(line.start.x), this.xScale(line.end.x));
-      const x2 = Math.max(this.xScale(line.start.x), this.xScale(line.end.x));
-      const y1 = Math.min(this.yScale(line.start.y), this.yScale(line.end.y));
-      const y2 = Math.max(this.yScale(line.start.y), this.yScale(line.end.y));
+      const x1 = this.xScale(line.start.x);
+      const y1 = this.yScale(line.start.y);
+      const x2 = this.xScale(line.end.x);
+      const y2 = this.yScale(line.end.y);
+
+
+      /**
+       * calculate length and midpoint for each line
+       */
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const lineLength = Math.sqrt(dx * dx + dy * dy);
+      const midX = (x1 + x2) / 2;
+      const midY = (y1 + y2) / 2;
+
+      // 6) Angle of the line in degrees:
+      const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+
+      // 7) Draw a thin rectangle around the line
+      //    - Make it width=10 (click "thickness"), height=lineLength
+      //    - Position its center at (midX, midY)
+      //    - Rotate around that center
+      const rectWidth = 10; // how "thick" you want the clickable area
+      const rectHeight = 50;
 
       let strokeColor = '';
 
@@ -304,13 +324,14 @@ export class ChartComponent implements AfterViewInit {
 
       this.svg.append("rect")
         .attr("class", `draggable draggable-${index}`)
-        .attr("x", x1 - 10)
-        .attr("y", Math.min(y1, y2) - 10)
-        .attr("width", (x2 - x1) + 20)
-        .attr("height", Math.abs(y1 - y2) + 20)
+        .attr('x', -rectWidth / 2)
+        .attr('y',-200)
+        .attr('width', rectWidth)
+        .attr('height', rectHeight)
         .attr("fill", "transparent")
         .attr('stroke', strokeColor)
         .attr('stroke-width', 2)
+        .attr('transform', `translate(${midX}, ${midY}) rotate(${angleDeg})`)
         .style("pointer-events", "all") // Ensure it can be interacted with
         .call(dragHandler);
     });
