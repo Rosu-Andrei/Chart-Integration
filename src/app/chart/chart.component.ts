@@ -209,7 +209,9 @@ export class ChartComponent implements AfterViewInit {
   addDragInteractions(): void {
 
     this.svg.selectAll('.draggable').remove();
-
+    /**
+     * ensures that the lines don't overlap each-other
+     */
     const checkBoundaries = (newAngles: number[]) => {
       return (
         newAngles[0] < newAngles[1] &&
@@ -217,7 +219,9 @@ export class ChartComponent implements AfterViewInit {
         newAngles[2] < newAngles[3]
       );
     };
-
+    /**
+     * iterate over each line displayed in page
+     */
     this.lineData.forEach((line, index) => {
       const dragHandler = d3.drag()
         .on('start', function () {
@@ -227,10 +231,14 @@ export class ChartComponent implements AfterViewInit {
         .on('drag', (event) => {
           // Maybe here will be an error
           const [x, y] = d3.pointer(event);
+          /**
+           * dx and dy represents the difference in position between where the mouse started the dragging
+           * and where it is now.
+           */
           const dx = this.xScale.invert(x) - line.start.x;
           const dy = this.yScale.invert(y) - line.start.y;
 
-          const angle = Math.atan2(dy, dx);
+          const angle = Math.atan2(dy, dx); // calculates the direction of the drag
           const length = Math.sqrt(
             (line.end.x - line.start.x) ** 2 +
             (line.end.y - line.start.y) ** 2
@@ -273,6 +281,27 @@ export class ChartComponent implements AfterViewInit {
       const y1 = Math.min(this.yScale(line.start.y), this.yScale(line.end.y));
       const y2 = Math.max(this.yScale(line.start.y), this.yScale(line.end.y));
 
+      let strokeColor = '';
+
+      switch (index) {
+        case 0:
+          strokeColor = 'red';
+          break;
+        case 1:
+          strokeColor = 'blue';
+          break;
+        case 2:
+          strokeColor = 'yellow';
+          break;
+        case 3:
+          strokeColor = 'purple';
+          break;
+        default:
+          strokeColor = '';
+          break;
+      }
+
+
       this.svg.append("rect")
         .attr("class", `draggable draggable-${index}`)
         .attr("x", x1 - 10)
@@ -280,6 +309,8 @@ export class ChartComponent implements AfterViewInit {
         .attr("width", (x2 - x1) + 20)
         .attr("height", Math.abs(y1 - y2) + 20)
         .attr("fill", "transparent")
+        .attr('stroke', strokeColor)
+        .attr('stroke-width', 2)
         .style("pointer-events", "all") // Ensure it can be interacted with
         .call(dragHandler);
     });
